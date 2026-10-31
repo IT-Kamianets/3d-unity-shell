@@ -21,9 +21,24 @@ namespace ITKamianets.Engine.Shell.Editor
 		/// <summary>Writes <c>Assets/Scenes/Boot.unity</c>. Opens a new scene, so call it after the game scene is saved and copy out anything the builder still needs from the old one.: a camera and the <see cref="ShellBoot"/> object.</summary>
 		public static void BuildBoot(string path = BootPath)
 		{
+			EnsureOauthFile();
 			var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 			new GameObject("Boot", typeof(ShellBoot));
 			Save(scene, path);
+		}
+
+		/// <summary>
+		/// Copies the Google Desktop OAuth client file from <c>~/.temnorid/google-oauth-desktop.json</c> (outside any repository) to
+		/// <c>Assets/Resources/account-oauth.json</c>, which every game keeps out of git, so the secret is never published but the
+		/// builds made on this machine carry it. Does nothing when the source file is not there.
+		/// </summary>
+		public static void EnsureOauthFile()
+		{
+			var source = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), ".temnorid", "google-oauth-desktop.json");
+			if (!File.Exists(source)) return;
+			Directory.CreateDirectory("Assets/Resources");
+			File.Copy(source, "Assets/Resources/account-oauth.json", true);
+			AssetDatabase.ImportAsset("Assets/Resources/account-oauth.json");
 		}
 
 		/// <summary>Writes <c>Assets/Scenes/Menu.unity</c>: the <see cref="ShellMenu"/> object, which makes its own camera and canvas.</summary>
