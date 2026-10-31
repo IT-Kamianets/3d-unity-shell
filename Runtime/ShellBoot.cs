@@ -1,4 +1,5 @@
 using System.Collections;
+using ITKamianets.Engine.Account;
 using ITKamianets.Engine.UI;
 using ITKamianets.Engine.Update;
 using UnityEngine;
@@ -73,6 +74,9 @@ namespace ITKamianets.Engine.Shell
 			var profile = ShellFlow.Begin();
 			var started = Time.unscaledTime;
 			SetStatus("");
+
+			// Who was playing last time, in the background: the splash does not wait for the network for this.
+			if (ShellConfig.Current.Accounts) _ = GameAccount.RestoreAsync();
 
 			var updater = ShellUpdates.Updater;
 			if (profile.autoUpdate && !string.IsNullOrEmpty(ShellConfig.Current.Repo))

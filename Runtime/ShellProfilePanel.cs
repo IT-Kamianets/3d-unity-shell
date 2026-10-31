@@ -1,4 +1,5 @@
 using System;
+using ITKamianets.Engine.Account;
 using ITKamianets.Engine.UI;
 using ITKamianets.Engine.Update;
 using UnityEngine;
@@ -17,6 +18,7 @@ namespace ITKamianets.Engine.Shell
 		readonly UiBuilder _ui;
 		readonly Text _updateLine;
 		readonly Text _autoLabel;
+		Text _accountLabel;
 		Button _updateButton;
 		Action<int> _showColour;
 		InputField _name;
@@ -44,14 +46,21 @@ namespace ITKamianets.Engine.Shell
 			});
 
 			Button auto = null;
-			auto = ui.Button("", Root.transform, new Vector2(0.08f, 0.37f), new Vector2(0.92f, 0.47f), () =>
+			auto = ui.Button("", Root.transform, new Vector2(0.08f, 0.37f), new Vector2(0.48f, 0.47f), () =>
 			{
 				ShellProfile.Current.autoUpdate = !ShellProfile.Current.autoUpdate;
 				ShellProfile.Current.Save();
 				Refresh();
 			});
 			_autoLabel = auto.GetComponentInChildren<Text>();
-			_autoLabel.fontSize = 30;
+			_autoLabel.fontSize = 24;
+
+			if (ShellConfig.Current.Accounts)
+			{
+				var account = ui.Button("", Root.transform, new Vector2(0.52f, 0.37f), new Vector2(0.92f, 0.47f), OnAccountButton);
+				_accountLabel = account.GetComponentInChildren<Text>();
+				_accountLabel.fontSize = 24;
+			}
 
 			_updateButton = ui.Button("Check for updates", Root.transform, new Vector2(0.08f, 0.25f), new Vector2(0.92f, 0.35f), OnUpdateButton);
 			_updateButton.GetComponentInChildren<Text>().fontSize = 30;
@@ -75,6 +84,11 @@ namespace ITKamianets.Engine.Shell
 			if (_name != null && !_name.isFocused) _name.SetTextWithoutNotify(ShellProfile.Current.name);
 			_showColour?.Invoke(ShellProfile.Current.colour);
 			UiBuilder.SetText(_autoLabel, "Update by itself: " + (ShellProfile.Current.autoUpdate ? "On" : "Off"));
+
+			if (_accountLabel != null)
+			{
+				UiBuilder.SetText(_accountLabel, !GameAccount.IsSignedIn ? "Sign in as guest" : GameAccount.IsGuest ? (GameAccount.GoogleAvailable ? "Sign in with Google" : "Guest account") : "Sign out");
+			}
 
 			var updater = ShellUpdates.Updater;
 			var version = "Version " + ShellConfig.Current.Version;
@@ -102,6 +116,19 @@ namespace ITKamianets.Engine.Shell
 					UiBuilder.SetText(_updateLine, version);
 					break;
 			}
+		}
+
+		async void OnAccountButton()
+		{
+			if (!GameAccount.IsSignedIn) await GameAccount.SignInAsGuestAsync();
+			else if (GameAccount.IsGuest) { if (GameAccount.GoogleAvailable) await GameAccount.SignInWithGoogleAsync(); }
+			else GameAccount.SignOut();
+			if (ShellProfile.Current != null && GameAccount.IsSignedIn && string.IsNullOrWhiteSpace(ShellProfile.Current.name) && !string.IsNullOrWhiteSpace(GameAccount.DisplayName))
+			{
+				ShellProfile.Current.name = ShellProfile.CleanName(GameAccount.DisplayName);
+				ShellProfile.Current.Save();
+			}
+			Refresh();
 		}
 
 		void OnUpdateButton()

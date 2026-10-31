@@ -37,6 +37,8 @@ namespace ITKamianets.Engine.Shell
 		public string InstallerSuffix = "-Setup.exe";
 		public string StoreUrl = "";
 		public int MaxPlayers = 4;
+		/// <summary>Whether the landing screen asks the player to sign in (Google, as in Lords) or play as a guest.</summary>
+		public bool Accounts = true;
 		/// <summary>Whether the landing screen offers playing with others.</summary>
 		public bool Multiplayer = true;
 		/// <summary>Scene names. The Boot scene is always first in the build.</summary>

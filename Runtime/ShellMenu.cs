@@ -1,4 +1,5 @@
 using System.Text;
+using ITKamianets.Engine.Account;
 using ITKamianets.Engine.Net;
 using ITKamianets.Engine.UI;
 using ITKamianets.Engine.Update;
@@ -17,6 +18,7 @@ namespace ITKamianets.Engine.Shell
 		enum Screen
 		{
 			Landing,
+			Sign,
 			Onboarding,
 			Profile,
 			Lobby,
@@ -28,6 +30,10 @@ namespace ITKamianets.Engine.Shell
 		Canvas _canvas;
 		GameObject _landing;
 		GameObject _onboarding;
+		GameObject _sign;
+		Text _signStatus;
+		Text _accountLine;
+		bool _afterSignMultiplayer;
 		GameObject _lobbyChoose;
 		GameObject _lobbyRoom;
 		ShellProfilePanel _profile;
@@ -60,6 +66,7 @@ namespace ITKamianets.Engine.Shell
 
 			ShellFlow.Begin();
 			if (!ShellFlow.Booted) ShellUpdates.CheckIfPossible();
+			if (config.Accounts) _ = GameAccount.RestoreAsync();
 
 			UiBuilder.EnsureEventSystem(transform);
 			_canvas = UiBuilder.CreateCanvas(transform, "MenuCanvas");
@@ -70,6 +77,7 @@ namespace ITKamianets.Engine.Shell
 			var root = safe.transform;
 
 			BuildLanding(root);
+			BuildSign(root);
 			BuildOnboarding(root);
 			_profile = new ShellProfilePanel(_ui, root, "Profile", () => Show(Screen.Landing));
 			BuildLobby(root);
@@ -115,6 +123,7 @@ namespace ITKamianets.Engine.Shell
 			if (!Application.isMobilePlatform)
 				_ui.Button("Quit", _landing.transform, new Vector2(0.36f, top - 0.1f), new Vector2(0.64f, top), Quit);
 
+			_accountLine = _ui.Label("Account", _landing.transform, "", 26, TextAnchor.LowerLeft, new Vector2(0.02f, 0.06f), new Vector2(0.4f, 0.11f), ShellUi.Muted);
 			_ui.Label("Version", _landing.transform, "v" + config.Version, 26, TextAnchor.LowerLeft, new Vector2(0.02f, 0.01f), new Vector2(0.3f, 0.06f), ShellUi.Muted);
 			_updateBanner = _ui.Label("Update", _landing.transform, "", 28, TextAnchor.MiddleRight, new Vector2(0.45f, 0.01f), new Vector2(0.78f, 0.07f), ShellConfig.Current.Accent);
 			_updateButton = _ui.Button("Update", _landing.transform, new Vector2(0.8f, 0.012f), new Vector2(0.98f, 0.068f), () => ShellUpdates.Updater.Install());
@@ -122,26 +131,98 @@ namespace ITKamianets.Engine.Shell
 			_updateButton.gameObject.SetActive(false);
 		}
 
-		void OnPlay()
+		void OnPlay() => Proceed(false);
+
+		void OnMultiplayer() => Proceed(true);
+
+		// Lords' order: sign in (once), onboarding (once), then the places.
+		void Proceed(bool multiplayer)
 		{
-			if (!ShellProfile.Current.onboarded)
+			var profile = ShellProfile.Current;
+			if (ShellConfig.Current.Accounts && !GameAccount.IsSignedIn && !profile.accountAsked)
 			{
-				_afterOnboardingMultiplayer = false;
+				_afterSignMultiplayer = multiplayer;
+				Show(Screen.Sign);
+				return;
+			}
+			if (!profile.onboarded)
+			{
+				_afterOnboardingMultiplayer = multiplayer;
 				Show(Screen.Onboarding);
 				return;
 			}
-			ShellFlow.PlaySolo();
+			if (multiplayer) Show(Screen.Lobby);
+			else ShellFlow.PlaySolo();
 		}
 
-		void OnMultiplayer()
+		// ---------------------------------------------------------------- sign in
+
+		void BuildSign(Transform root)
 		{
-			if (!ShellProfile.Current.onboarded)
+			var config = ShellConfig.Current;
+			_sign = UiBuilder.Box("Sign", root, new Vector2(0.28f, 0.14f), new Vector2(0.72f, 0.86f), ShellUi.Panel);
+			_ui.Label("Title", _sign.transform, "Sign in", 64, TextAnchor.MiddleCenter, new Vector2(0.05f, 0.84f), new Vector2(0.95f, 0.97f), config.Accent);
+			_ui.Label("Hint", _sign.transform, "Use the same account as in Lords, or just play as a guest. You can sign in later from Profile and keep your progress.", 28, TextAnchor.MiddleCenter, new Vector2(0.08f, 0.68f), new Vector2(0.92f, 0.83f), ShellUi.Muted, true);
+			var google = ShellUi.Primary(_ui, "Sign in with Google", _sign.transform, new Vector2(0.12f, 0.52f), new Vector2(0.88f, 0.65f), OnGoogle);
+			google.GetComponentInChildren<Text>().fontSize = 32;
+			google.gameObject.name = "GoogleButton";
+			_ui.Button("Play as a guest", _sign.transform, new Vector2(0.12f, 0.37f), new Vector2(0.88f, 0.5f), OnGuest).GetComponentInChildren<Text>().fontSize = 32;
+			_ui.Button("Play offline", _sign.transform, new Vector2(0.12f, 0.22f), new Vector2(0.88f, 0.35f), OnOffline).GetComponentInChildren<Text>().fontSize = 32;
+			_signStatus = _ui.Label("Status", _sign.transform, "", 26, TextAnchor.MiddleCenter, new Vector2(0.05f, 0.13f), new Vector2(0.95f, 0.21f), ShellUi.Bad, true);
+			_ui.Button("Back", _sign.transform, new Vector2(0.3f, 0.02f), new Vector2(0.7f, 0.12f), () => Show(Screen.Landing)).GetComponentInChildren<Text>().fontSize = 30;
+		}
+
+		async void OnGoogle()
+		{
+			UiBuilder.SetText(_signStatus, GameAccount.GoogleAvailable ? "Finish signing in in your browser…" : "Google sign-in is not set up on this device yet. Play as a guest for now.");
+			if (!GameAccount.GoogleAvailable) return;
+			var ok = await GameAccount.SignInWithGoogleAsync();
+			if (this == null) return;
+			if (ok) SignedIn();
+			else UiBuilder.SetText(_signStatus, GameAccount.LastError);
+		}
+
+		async void OnGuest()
+		{
+			UiBuilder.SetText(_signStatus, "Signing in…");
+			var ok = await GameAccount.SignInAsGuestAsync();
+			if (this == null) return;
+			if (ok) SignedIn();
+			else
 			{
-				_afterOnboardingMultiplayer = true;
-				Show(Screen.Onboarding);
-				return;
+				// No connection is not a reason to stop the player: they play offline and are asked again next time.
+				UiBuilder.SetText(_signStatus, "No connection, so you play offline this time.");
+				Continue();
 			}
-			Show(Screen.Lobby);
+		}
+
+		void OnOffline()
+		{
+			ShellProfile.Current.accountAsked = true;
+			ShellProfile.Current.Save();
+			Continue();
+		}
+
+		void SignedIn()
+		{
+			var profile = ShellProfile.Current;
+			profile.accountAsked = true;
+			if (string.IsNullOrWhiteSpace(profile.name) && !string.IsNullOrWhiteSpace(GameAccount.DisplayName))
+				profile.name = ShellProfile.CleanName(GameAccount.DisplayName);
+			profile.Save();
+			Continue();
+		}
+
+		void Continue()
+		{
+			var profile = ShellProfile.Current;
+			if (!profile.onboarded)
+			{
+				_afterOnboardingMultiplayer = _afterSignMultiplayer;
+				Show(Screen.Onboarding);
+			}
+			else if (_afterSignMultiplayer) Show(Screen.Lobby);
+			else ShellFlow.PlaySolo();
 		}
 
 		static void Quit()
@@ -332,6 +413,7 @@ namespace ITKamianets.Engine.Shell
 		{
 			_screen = screen;
 			_landing.SetActive(screen == Screen.Landing);
+			_sign.SetActive(screen == Screen.Sign);
 			_onboarding.SetActive(screen == Screen.Onboarding);
 			_profile.Root.SetActive(screen == Screen.Profile);
 			_lobbyChoose.SetActive(false);
@@ -343,7 +425,7 @@ namespace ITKamianets.Engine.Shell
 			}
 			else if (screen == Screen.Profile) _profile.Refresh();
 
-			var active = screen == Screen.Landing ? _landing : screen == Screen.Onboarding ? _onboarding : screen == Screen.Profile ? _profile.Root : NetSession.Instance.IsOnline ? _lobbyRoom : _lobbyChoose;
+			var active = screen == Screen.Landing ? _landing : screen == Screen.Sign ? _sign : screen == Screen.Onboarding ? _onboarding : screen == Screen.Profile ? _profile.Root : NetSession.Instance.IsOnline ? _lobbyRoom : _lobbyChoose;
 			UiBuilder.Select(active);
 		}
 
@@ -359,6 +441,7 @@ namespace ITKamianets.Engine.Shell
 				? updater.Latest.Version + " is available"
 				: updater.State == UpdateState.Downloading ? "Downloading " + Mathf.RoundToInt(updater.Progress * 100f) + "%" : "");
 
+			UiBuilder.SetText(_accountLine, !ShellConfig.Current.Accounts ? "" : GameAccount.IsSignedIn ? (GameAccount.IsGuest ? "Guest" : "Signed in: " + (string.IsNullOrEmpty(GameAccount.DisplayName) ? GameAccount.Email : GameAccount.DisplayName)) : "Not signed in");
 			if (_screen == Screen.Profile) _profile.Refresh();
 			if (_screen == Screen.Lobby) RefreshLobby();
 		}

@@ -13,6 +13,8 @@ namespace ITKamianets.Engine.Shell
 		public int colour;
 		public bool onboarded;
 		public bool autoUpdate = true;
+		/// <summary>The sign-in screen has been shown once; a player who chose to play offline is not asked again.</summary>
+		public bool accountAsked;
 
 		static ShellProfile _current;
 
