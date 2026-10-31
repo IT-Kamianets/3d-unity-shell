@@ -1,0 +1,14 @@
+{
+  "name": "ITKamianets.Engine.Shell.Editor",
+  "rootNamespace": "ITKamianets.Engine.Shell.Editor",
+  "references": ["ITKamianets.Engine.Shell"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

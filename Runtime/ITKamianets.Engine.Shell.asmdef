@@ -1,0 +1,22 @@
+{
+  "name": "ITKamianets.Engine.Shell",
+  "rootNamespace": "ITKamianets.Engine.Shell",
+  "references": [
+    "ITKamianets.Engine.Core",
+    "ITKamianets.Engine.Input",
+    "ITKamianets.Engine.UI",
+    "ITKamianets.Engine.Net",
+    "ITKamianets.Engine.Update",
+    "Unity.InputSystem",
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
