@@ -1,6 +1,6 @@
 {
   "name": "com.itkamianets.3d-unity-shell",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "displayName": "Unity Shell",
   "description": "The shared structure every Temnorid game follows, taken from the Lords app: a splash while the game finds out who is playing and whether it is up to date, a landing screen, a one-time onboarding for a name and a colour, a lobby for playing with others, and in-game chrome with a top bar and a bottom bar of places. Games add their own places; the shell owns the rest.",
   "unity": "6000.6",

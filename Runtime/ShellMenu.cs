@@ -145,6 +145,7 @@ namespace ITKamianets.Engine.Shell
 				Show(Screen.Sign);
 				return;
 			}
+			AdoptAccount();
 			if (!profile.onboarded)
 			{
 				_afterOnboardingMultiplayer = multiplayer;
@@ -213,8 +214,27 @@ namespace ITKamianets.Engine.Shell
 			Continue();
 		}
 
+		/// <summary>
+		/// A player signed in with Google already has a name (their Google name, and a lord's name in Lords), so the "Who is playing?"
+		/// screen is for guests and offline players only. Their profile is filled in from the account and marked as done.
+		/// </summary>
+		static void AdoptAccount()
+		{
+			if (!GameAccount.IsSignedIn || GameAccount.IsGuest) return;
+			var profile = ShellProfile.Current;
+			if (profile.onboarded && !string.IsNullOrWhiteSpace(profile.name)) return;
+
+			var name = ShellProfile.CleanName(GameAccount.DisplayName);
+			if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(GameAccount.Email)) name = ShellProfile.CleanName(GameAccount.Email.Split('@')[0]);
+			if (string.IsNullOrWhiteSpace(profile.name)) profile.name = string.IsNullOrEmpty(name) ? "Player" : name;
+			profile.onboarded = true;
+			profile.accountAsked = true;
+			profile.Save();
+		}
+
 		void Continue()
 		{
+			AdoptAccount();
 			var profile = ShellProfile.Current;
 			if (!profile.onboarded)
 			{
