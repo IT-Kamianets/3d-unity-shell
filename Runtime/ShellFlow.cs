@@ -33,8 +33,12 @@ namespace ITKamianets.Engine.Shell
 			LoadGame();
 		}
 
+		/// <summary>True once the game scene has been loaded in this run, so a later return to the menu shows its landing screen instead of skipping it.</summary>
+		public static bool GameLoaded { get; private set; }
+
 		public static void LoadGame()
 		{
+			GameLoaded = true;
 			Time.timeScale = 1f;
 			SceneManager.LoadScene(ShellConfig.Current.GameScene);
 		}

@@ -32,8 +32,15 @@ namespace ITKamianets.Engine.Shell
 		GameObject _onboarding;
 		GameObject _sign;
 		Text _signStatus;
+		Text _signTitle;
+		Text _signHint;
+		Button _signBack;
 		Text _accountLine;
 		bool _afterSignMultiplayer;
+		/// <summary>True while the welcome screen is the first thing the player sees: no Back button, and it ends on the landing screen.</summary>
+		bool _welcome;
+		/// <summary>Set when a guest could not be created (no connection): the player plays offline this run and is asked again next start.</summary>
+		bool _offlineThisRun;
 		GameObject _lobbyChoose;
 		GameObject _lobbyRoom;
 		ShellProfilePanel _profile;
@@ -88,8 +95,20 @@ namespace ITKamianets.Engine.Shell
 			net.GameStarted += OnGameStarted;
 			net.Disconnected += OnDisconnected;
 
-			Show(Screen.Landing);
+			if (NeedsAccountChoice())
+			{
+				_welcome = true;
+				Show(Screen.Sign);
+			}
+			else if (SkipsLanding()) Proceed(false);
+			else Show(Screen.Landing);
 		}
+
+		/// <summary>True on the first start of a game that has its own start scene: no landing screen between sign-in and the game.</summary>
+		static bool SkipsLanding() => ShellConfig.Current.SkipLanding && !ShellFlow.GameLoaded;
+
+		/// <summary>The one question every game asks the first time: Google or a guest. Not asked again once answered, or while signed in.</summary>
+		static bool NeedsAccountChoice() => ShellConfig.Current.Accounts && !GameAccount.IsSignedIn && !ShellProfile.Current.accountAsked;
 
 		void OnDestroy()
 		{
@@ -118,8 +137,11 @@ namespace ITKamianets.Engine.Shell
 				_ui.Button("Play with others", _landing.transform, new Vector2(0.36f, top - 0.1f), new Vector2(0.64f, top), OnMultiplayer);
 				top -= step;
 			}
+			if (config.Profile)
+			{
 			_ui.Button("Profile", _landing.transform, new Vector2(0.36f, top - 0.1f), new Vector2(0.64f, top), () => Show(Screen.Profile));
-			top -= step;
+				top -= step;
+			}
 			if (!Application.isMobilePlatform)
 				_ui.Button("Quit", _landing.transform, new Vector2(0.36f, top - 0.1f), new Vector2(0.64f, top), Quit);
 
@@ -139,7 +161,7 @@ namespace ITKamianets.Engine.Shell
 		void Proceed(bool multiplayer)
 		{
 			var profile = ShellProfile.Current;
-			if (ShellConfig.Current.Accounts && !GameAccount.IsSignedIn && !profile.accountAsked)
+			if (!_offlineThisRun && NeedsAccountChoice())
 			{
 				_afterSignMultiplayer = multiplayer;
 				Show(Screen.Sign);
@@ -162,19 +184,31 @@ namespace ITKamianets.Engine.Shell
 		{
 			var config = ShellConfig.Current;
 			_sign = UiBuilder.Box("Sign", root, new Vector2(0.28f, 0.14f), new Vector2(0.72f, 0.86f), ShellUi.Panel);
-			_ui.Label("Title", _sign.transform, "Sign in", 64, TextAnchor.MiddleCenter, new Vector2(0.05f, 0.84f), new Vector2(0.95f, 0.97f), config.Accent);
-			_ui.Label("Hint", _sign.transform, "Use the same account as in Lords, or just play as a guest. You can sign in later from Profile and keep your progress.", 28, TextAnchor.MiddleCenter, new Vector2(0.08f, 0.68f), new Vector2(0.92f, 0.83f), ShellUi.Muted, true);
-			var google = ShellUi.Primary(_ui, "Sign in with Google", _sign.transform, new Vector2(0.12f, 0.52f), new Vector2(0.88f, 0.65f), OnGoogle);
+			_signTitle = _ui.Label("Title", _sign.transform, "Welcome", 64, TextAnchor.MiddleCenter, new Vector2(0.05f, 0.84f), new Vector2(0.95f, 0.97f), config.Accent);
+			_signHint = _ui.Label("Hint", _sign.transform, "", 28, TextAnchor.MiddleCenter, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.83f), ShellUi.Muted, true);
+			var google = ShellUi.Primary(_ui, "Sign in with Google", _sign.transform, new Vector2(0.12f, 0.5f), new Vector2(0.88f, 0.63f), OnGoogle);
 			google.GetComponentInChildren<Text>().fontSize = 32;
 			google.gameObject.name = "GoogleButton";
-			_ui.Button("Play as a guest", _sign.transform, new Vector2(0.12f, 0.37f), new Vector2(0.88f, 0.5f), OnGuest).GetComponentInChildren<Text>().fontSize = 32;
-			_ui.Button("Play offline", _sign.transform, new Vector2(0.12f, 0.22f), new Vector2(0.88f, 0.35f), OnOffline).GetComponentInChildren<Text>().fontSize = 32;
-			_signStatus = _ui.Label("Status", _sign.transform, "", 26, TextAnchor.MiddleCenter, new Vector2(0.05f, 0.13f), new Vector2(0.95f, 0.21f), ShellUi.Bad, true);
-			_ui.Button("Back", _sign.transform, new Vector2(0.3f, 0.02f), new Vector2(0.7f, 0.12f), () => Show(Screen.Landing)).GetComponentInChildren<Text>().fontSize = 30;
+			var guest = _ui.Button("Continue as a guest", _sign.transform, new Vector2(0.12f, 0.34f), new Vector2(0.88f, 0.47f), OnGuest);
+			guest.GetComponentInChildren<Text>().fontSize = 32;
+			guest.gameObject.name = "GuestButton";
+			_signStatus = _ui.Label("Status", _sign.transform, "", 26, TextAnchor.MiddleCenter, new Vector2(0.05f, 0.2f), new Vector2(0.95f, 0.32f), ShellUi.Bad, true);
+			_signBack = _ui.Button("Back", _sign.transform, new Vector2(0.3f, 0.04f), new Vector2(0.7f, 0.14f), () => Show(Screen.Landing));
+			_signBack.GetComponentInChildren<Text>().fontSize = 30;
+		}
+
+		/// <summary>Fills the sign-in screen for how it was reached: the welcome at first start, or the gate in front of Play.</summary>
+		void PrepareSign()
+		{
+			UiBuilder.SetText(_signTitle, _welcome ? "Welcome" : "Sign in");
+			UiBuilder.SetText(_signHint, (_welcome ? ShellConfig.Current.Title + ": sign in" : "Sign in") + " with the same Google account as in Lords, or continue as a guest." + (ShellConfig.Current.Profile ? " You can sign in later from Profile and keep your progress." : ""));
+			UiBuilder.SetText(_signStatus, "");
+			_signBack.gameObject.SetActive(!_welcome);
 		}
 
 		async void OnGoogle()
 		{
+			if (GameAccount.Busy) return;
 			UiBuilder.SetText(_signStatus, GameAccount.GoogleAvailable ? "Finish signing in in your browser…" : "Google sign-in is not set up on this device yet. Play as a guest for now.");
 			if (!GameAccount.GoogleAvailable) return;
 			var ok = await GameAccount.SignInWithGoogleAsync();
@@ -185,6 +219,7 @@ namespace ITKamianets.Engine.Shell
 
 		async void OnGuest()
 		{
+			if (GameAccount.Busy) return;
 			UiBuilder.SetText(_signStatus, "Signing in…");
 			var ok = await GameAccount.SignInAsGuestAsync();
 			if (this == null) return;
@@ -192,16 +227,10 @@ namespace ITKamianets.Engine.Shell
 			else
 			{
 				// No connection is not a reason to stop the player: they play offline and are asked again next time.
+				_offlineThisRun = true;
 				UiBuilder.SetText(_signStatus, "No connection, so you play offline this time.");
 				Continue();
 			}
-		}
-
-		void OnOffline()
-		{
-			ShellProfile.Current.accountAsked = true;
-			ShellProfile.Current.Save();
-			Continue();
 		}
 
 		void SignedIn()
@@ -235,6 +264,14 @@ namespace ITKamianets.Engine.Shell
 		void Continue()
 		{
 			AdoptAccount();
+			if (_welcome)
+			{
+				_welcome = false;
+				if (SkipsLanding()) Proceed(false);
+				else Show(Screen.Landing);
+				return;
+			}
+
 			var profile = ShellProfile.Current;
 			if (!profile.onboarded)
 			{
@@ -434,6 +471,7 @@ namespace ITKamianets.Engine.Shell
 			_screen = screen;
 			_landing.SetActive(screen == Screen.Landing);
 			_sign.SetActive(screen == Screen.Sign);
+			if (screen == Screen.Sign) PrepareSign();
 			_onboarding.SetActive(screen == Screen.Onboarding);
 			_profile.Root.SetActive(screen == Screen.Profile);
 			_lobbyChoose.SetActive(false);

@@ -41,6 +41,14 @@ namespace ITKamianets.Engine.Shell
 		public bool Accounts = true;
 		/// <summary>Whether the landing screen offers playing with others.</summary>
 		public bool Multiplayer = true;
+		/// <summary>Whether the landing screen offers the Profile screen. The in-game Profile place (pause, settings, sign-out) stays.</summary>
+		public bool Profile = true;
+
+		/// <summary>
+		/// Whether the first start goes from sign-in straight into the game, with no landing screen: the game has its own start scene.
+		/// Coming back to the menu later (Main menu in the Profile place) still shows the landing screen.
+		/// </summary>
+		public bool SkipLanding = false;
 		/// <summary>Scene names. The Boot scene is always first in the build.</summary>
 		public string MenuScene = "Menu";
 		public string GameScene = "Main";
