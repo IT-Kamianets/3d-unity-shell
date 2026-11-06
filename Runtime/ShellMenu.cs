@@ -73,7 +73,7 @@ namespace ITKamianets.Engine.Shell
 
 			ShellFlow.Begin();
 			if (!ShellFlow.Booted) ShellUpdates.CheckIfPossible();
-			if (config.Accounts) _ = GameAccount.RestoreAsync();
+			if (config.Accounts) _ = ShellLord.RestoreAndSyncAsync();
 
 			UiBuilder.EnsureEventSystem(transform);
 			_canvas = UiBuilder.CreateCanvas(transform, "MenuCanvas");
@@ -251,6 +251,7 @@ namespace ITKamianets.Engine.Shell
 		{
 			if (!GameAccount.IsSignedIn || GameAccount.IsGuest) return;
 			var profile = ShellProfile.Current;
+			_ = ShellLord.SyncAsync();
 			if (profile.onboarded && !string.IsNullOrWhiteSpace(profile.name)) return;
 
 			var name = ShellProfile.CleanName(GameAccount.DisplayName);
@@ -259,6 +260,7 @@ namespace ITKamianets.Engine.Shell
 			profile.onboarded = true;
 			profile.accountAsked = true;
 			profile.Save();
+			_ = ShellLord.SyncAsync();
 		}
 
 		void Continue()

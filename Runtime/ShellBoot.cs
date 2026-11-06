@@ -76,7 +76,7 @@ namespace ITKamianets.Engine.Shell
 			SetStatus("");
 
 			// Who was playing last time, in the background: the splash does not wait for the network for this.
-			if (ShellConfig.Current.Accounts) _ = GameAccount.RestoreAsync();
+			if (ShellConfig.Current.Accounts) _ = ShellLord.RestoreAndSyncAsync();
 
 			var updater = ShellUpdates.Updater;
 			if (profile.autoUpdate && !string.IsNullOrEmpty(ShellConfig.Current.Repo))

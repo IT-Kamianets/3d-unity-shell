@@ -28,6 +28,11 @@ namespace ITKamianets.Engine.Shell
 
 		public event Action<string> PlaceSelected;
 
+		/// <summary>The arrows on each side of the tabs, for a game that shows one place at a time (<see cref="EnableNavigation"/>).</summary>
+		public event Action NavigatePrevious;
+
+		public event Action NavigateNext;
+
 		public string CurrentPlace { get; private set; } = "";
 		public float TopFraction => 0.07f;
 		public float BottomFraction => BottomTabs ? 0.1f : 0f;
@@ -36,6 +41,7 @@ namespace ITKamianets.Engine.Shell
 		UiBuilder _ui;
 		Canvas _canvas;
 		RectTransform _safe;
+		Transform _topBar;
 		Text _placeTitle;
 		Text _player;
 		Text _status;
@@ -43,6 +49,9 @@ namespace ITKamianets.Engine.Shell
 		readonly List<Image> _tabBack = new List<Image>();
 		readonly List<Text> _tabText = new List<Text>();
 		GameObject _tabs;
+		GameObject _previous;
+		GameObject _next;
+		bool _navigation;
 		ShellProfilePanel _profile;
 		float _refreshAt;
 
@@ -76,20 +85,23 @@ namespace ITKamianets.Engine.Shell
 			_safe = (RectTransform)safe.transform;
 
 			var bar = UiBuilder.Box("TopBar", _safe, new Vector2(0f, 1f - TopFraction), Vector2.one, new Color(0.07f, 0.067f, 0.067f, 0.92f));
+			_topBar = bar.transform;
 			_ui.Label("Game", bar.transform, config.Title, 34, TextAnchor.MiddleLeft, new Vector2(0.015f, 0f), new Vector2(0.3f, 1f), config.Accent);
-			_placeTitle = _ui.Label("Place", bar.transform, "", 30, TextAnchor.MiddleCenter, new Vector2(0.3f, 0f), new Vector2(0.62f, 1f), ShellUi.Text);
+			_placeTitle = _ui.Label("Place", bar.transform, "", 30, TextAnchor.MiddleCenter, new Vector2(0.3f, 0f), new Vector2(0.7f, 1f), ShellUi.Text);
 			_status = _ui.Label("Status", bar.transform, "", 24, TextAnchor.MiddleRight, new Vector2(0.55f, 0f), new Vector2(0.8f, 1f), ShellUi.Muted);
 			_player = _ui.Label("Player", bar.transform, "", 28, TextAnchor.MiddleRight, new Vector2(0.8f, 0f), new Vector2(0.985f, 1f), ShellUi.Text);
+			_previous = MakeArrow(bar.transform, "<", new Vector2(0.27f, 0.1f), new Vector2(0.32f, 0.9f), () => NavigatePrevious?.Invoke());
+			_next = MakeArrow(bar.transform, ">", new Vector2(0.74f, 0.1f), new Vector2(0.79f, 0.9f), () => NavigateNext?.Invoke());
 
 			_places.Clear();
 			foreach (var place in config.Places) _places.Add(place);
-			_places.Add(new ShellPlace(ProfilePlace, "Profile", ""));
+			if (config.Profile) _places.Add(new ShellPlace(ProfilePlace, "Profile", ""));
 			BuildTabs();
 
-			_profile = new ShellProfilePanel(_ui, _safe, "Profile", () => Select(_places.Count > 1 ? _places[0].Id : ""), "Resume", () => ShellFlow.QuitToMenu(), "Main menu");
+			_profile = new ShellProfilePanel(_ui, _safe, "Profile", () => Select(_places.Count > OwnPlaces ? _places[0].Id : ""), "Resume", () => ShellFlow.QuitToMenu(), "Main menu");
 			_profile.Root.SetActive(false);
 
-			if (_places.Count > 1) Select(_places[0].Id, false);
+			if (_places.Count > OwnPlaces) Select(_places[0].Id, false);
 			RefreshBar();
 		}
 
@@ -98,10 +110,35 @@ namespace ITKamianets.Engine.Shell
 		{
 			_places.Clear();
 			foreach (var place in places) _places.Add(place);
-			_places.Add(new ShellPlace(ProfilePlace, "Profile", ""));
+			if (ShellConfig.Current.Profile) _places.Add(new ShellPlace(ProfilePlace, "Profile", ""));
 			BuildTabs();
-			if (_places.Count > 1) Select(_places[0].Id, false);
+			if (_places.Count > OwnPlaces) Select(_places[0].Id, false);
 		}
+
+		GameObject MakeArrow(Transform parent, string text, Vector2 min, Vector2 max, Action onClick)
+		{
+			var button = _ui.Button(text, parent, min, max, onClick);
+			button.GetComponentInChildren<Text>().fontSize = 34;
+			button.gameObject.SetActive(false);
+			return button.gameObject;
+		}
+
+		/// <summary>Makes room for the arrows around the tabs. Call once; then <see cref="SetNavigationVisible"/> shows or hides them.</summary>
+		public void EnableNavigation()
+		{
+			if (_navigation) return;
+			_navigation = true;
+			BuildTabs();
+		}
+
+		public void SetNavigationVisible(bool visible)
+		{
+			if (_previous != null) _previous.SetActive(visible && _navigation);
+			if (_next != null) _next.SetActive(visible && _navigation);
+		}
+
+		/// <summary>How many places are the Profile place: none when the game has no Profile.</summary>
+		static int OwnPlaces => ShellConfig.Current.Profile ? 1 : 0;
 
 		void BuildTabs()
 		{
@@ -110,7 +147,7 @@ namespace ITKamianets.Engine.Shell
 			_tabText.Clear();
 
 			var bottom = BottomTabs;
-			_tabs = UiBuilder.Box("Tabs", _safe, bottom ? Vector2.zero : new Vector2(0.28f, 1f - TopFraction), bottom ? new Vector2(1f, BottomFraction) : new Vector2(0.78f, 1f), bottom ? new Color(0.07f, 0.067f, 0.067f, 0.94f) : Color.clear);
+			_tabs = UiBuilder.Box("Tabs", _safe, bottom ? Vector2.zero : new Vector2(_navigation ? 0.33f : 0.28f, 1f - TopFraction), bottom ? new Vector2(1f, BottomFraction) : new Vector2(_navigation ? 0.73f : 0.78f, 1f), bottom ? new Color(0.07f, 0.067f, 0.067f, 0.94f) : Color.clear);
 			var count = _places.Count;
 			for (var i = 0; i < count; i++)
 			{
@@ -142,7 +179,8 @@ namespace ITKamianets.Engine.Shell
 				var on = _places[i].Id == id;
 				_tabBack[i].color = on ? new Color(ShellConfig.Current.Accent.r, ShellConfig.Current.Accent.g, ShellConfig.Current.Accent.b, 0.22f) : Color.clear;
 				_tabText[i].color = on ? ShellConfig.Current.Accent : ShellUi.Muted;
-				if (on) UiBuilder.SetText(_placeTitle, _places[i].Label);
+				// On a desktop the highlighted tab already says where the player is.
+					if (on && BottomTabs) UiBuilder.SetText(_placeTitle, _places[i].Label);
 			}
 
 			if (_profile != null)
@@ -163,6 +201,15 @@ namespace ITKamianets.Engine.Shell
 		public Canvas Canvas => _canvas;
 
 		public RectTransform Safe => _safe;
+
+		/// <summary>The top bar, for a game that adds its own small readouts (icons with numbers) to it.</summary>
+		public Transform TopBar => _topBar;
+
+		/// <summary>Sets the name shown in the middle of the top bar (a place, a map), whatever the platform.</summary>
+		public void SetTitle(string text)
+		{
+			if (_placeTitle != null) UiBuilder.SetText(_placeTitle, text ?? "");
+		}
 
 		void RefreshBar()
 		{
